@@ -46,28 +46,29 @@ jobs:
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             DTC=/usr/bin/dtc DTC_EXT=/usr/bin/dtc
 
+      - name: Make Image.gz-dtb
+        run: |
+          make -j$(nproc) O=out ARCH=arm64 \
+            CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
+            OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            DTC=/usr/bin/dtc DTC_EXT=/usr/bin/dtc \
+            Image.gz-dtb || true
+
       - name: List outputs
         if: always()
         run: |
           ls -la out/arch/arm64/boot/ || true
-          ls out/arch/arm64/boot/dts/xiaomi/ out/arch/arm64/boot/dts/qcom/ 2>/dev/null | grep -i trinket || true
-
-      - name: Debug dtc
-        if: always()
-        run: |
-          which dtc
-          dtc --version
-          clang -E -nostdinc \
-            -I arch/arm64/boot/dts -I arch/arm64/boot/dts/include -I include \
-            -undef -D__DTS__ -x assembler-with-cpp \
-            -o /tmp/ov.dts arch/arm64/boot/dts/xiaomi/ginkgo-trinket-overlay.dts || true
-          echo "== old kernel dtc =="
-          out/scripts/dtc/dtc -@ -I dts -O dtb -o /dev/null /tmp/ov.dts > /tmp/old.log 2>&1; echo "exit: $?"; head -3 /tmp/old.log
-          echo "== system dtc =="
-          dtc -@ -I dts -O dtb -o /dev/null /tmp/ov.dts > /tmp/new.log 2>&1; echo "exit: $?"; head -3 /tmp/new.log
+          echo "== dtb files =="
+          find out/arch/arm64/boot/dts -name '*.dtb' | head -40 || true
+          echo "== dtbo files =="
+          find out/arch/arm64/boot/dts -name '*.dtbo' | head -10 || true
 
       - name: Package
         run: |
+          test -f out/arch/arm64/boot/Image.gz-dtb || { echo "Image.gz-dtb nai, zip banano holo na"; exit 1; }
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3
           cd AnyKernel3
           rm -rf .git
