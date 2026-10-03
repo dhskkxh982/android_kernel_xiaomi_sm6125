@@ -1,0 +1,50 @@
+name: Build Kernel
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev python3 zip git device-tree-compiler lld
+
+      - name: Toolchain
+        run: git clone --depth=1 https://github.com/kdrag0n/proton-clang ~/clang
+
+      - name: Check configs
+        run: ls -la arch/arm64/configs/vendor/trinket-perf_defconfig arch/arm64/configs/vendor/xiaomi-trinket.config arch/arm64/configs/vendor/ginkgo.config
+
+      - name: Configure
+        run: |
+          export PATH=~/clang/bin:$PATH
+          make O=out ARCH=arm64 CC=clang vendor/trinket-perf_defconfig vendor/xiaomi-trinket.config vendor/ginkgo.config
+          scripts/config --file out/.config \
+            -e MODULES -e MODULE_UNLOAD -e MODULE_FORCE_LOAD \
+            -d MODULE_SIG -d MODULE_SIG_FORCE -d MODULE_SIG_ALL -d MODVERSIONS
+          make O=out ARCH=arm64 CC=clang olddefconfig
+          grep -E "CONFIG_MODULES|CONFIG_MODULE_SIG|MODVERSIONS|FORCE_LOAD" out/.config
+
+      - name: Build
+        run: |
+          export PATH=~/clang/bin:$PATH
+          make -j$(nproc) O=out ARCH=arm64 CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+
+      - name: Package
+        run: |
+          ls out/arch/arm64/boot/
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3
+          cd AnyKernel3
+          rm -rf .git
+          sed -i 's/^device.name1=.*/device.name1=ginkgo/; s/^device.name2=.*/device.name2=willow/' anykernel.sh
+          sed -i 's|^block=.*|block=/dev/block/bootdevice/by-name/boot;|; s/^is_slot_device=.*/is_slot_device=0;/' anykernel.sh
+          cp ../out/arch/arm64/boot/Image.gz-dtb . || cp ../out/arch/arm64/boot/Image.gz .
+          zip -r9 ../kernel-ginkgo.zip *
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel-ginkgo
+          path: kernel-ginkgo.zip
