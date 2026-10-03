@@ -38,19 +38,30 @@ jobs:
 
       - name: Build
         run: |
-          make -j$(nproc) O=out ARCH=arm64 \
+          make -k -j$(nproc) O=out ARCH=arm64 \
             CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
             OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
+      - name: List outputs
+        if: always()
+        run: |
+          ls -la out/arch/arm64/boot/ || true
+          ls out/arch/arm64/boot/dts/xiaomi/ out/arch/arm64/boot/dts/qcom/ 2>/dev/null | grep -i trinket || true
+
       - name: Package
         run: |
-          ls out/arch/arm64/boot/
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3
           cd AnyKernel3
           rm -rf .git
           sed -i 's/^device.name1=.*/device.name1=ginkgo/; s/^device.name2=.*/device.name2=willow/' anykernel.sh
           sed -i 's|^block=.*|block=/dev/block/bootdevice/by-name/boot;|; s/^is_slot_device=.*/is_slot_device=0;/' anykernel.sh
           cp ../out/arch/arm64/boot/Image.gz-dtb . || cp ../out/arch/arm64/boot/Image.gz .
+          zip -r9 ../kernel-ginkgo.zip *
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel-ginkgo
+          path: kernel-ginkgo.zip
