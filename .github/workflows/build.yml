@@ -51,6 +51,21 @@ jobs:
           ls -la out/arch/arm64/boot/ || true
           ls out/arch/arm64/boot/dts/xiaomi/ out/arch/arm64/boot/dts/qcom/ 2>/dev/null | grep -i trinket || true
 
+      - name: Debug dtc
+        if: always()
+        run: |
+          clang --version | head -1
+          out/scripts/dtc/dtc --version || true
+          clang -E -nostdinc \
+            -I arch/arm64/boot/dts -I arch/arm64/boot/dts/include -I include \
+            -undef -D__DTS__ -x assembler-with-cpp \
+            -o /tmp/ov.dts arch/arm64/boot/dts/xiaomi/ginkgo-trinket-overlay.dts || true
+          ls -la /tmp/ov.dts || true
+          out/scripts/dtc/dtc -@ -I dts -O dtb -o /dev/null /tmp/ov.dts 2>&1 | head -5 || true
+          N=$(grep -n 'trinket-thermal-overlay.dtsi' /tmp/ov.dts | head -1 | cut -d: -f1)
+          echo "marker line: $N"
+          if [ -n "$N" ]; then sed -n "$((N-15)),$((N+20))p" /tmp/ov.dts; fi
+
       - name: Package
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3
