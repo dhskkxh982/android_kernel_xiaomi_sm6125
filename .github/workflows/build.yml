@@ -72,8 +72,12 @@ jobs:
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3
           cd AnyKernel3
           rm -rf .git
-          sed -i 's/^device.name1=.*/device.name1=ginkgo/; s/^device.name2=.*/device.name2=willow/' anykernel.sh
-          sed -i 's|^block=.*|block=/dev/block/bootdevice/by-name/boot;|; s/^is_slot_device=.*/is_slot_device=0;/' anykernel.sh
+          sed -i -E 's|^[Dd]evice\.name1=.*|device.name1=ginkgo|; s|^[Dd]evice\.name2=.*|device.name2=willow|' anykernel.sh
+          sed -i -E 's|^[Bb][Ll][Oo][Cc][Kk]=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
+          sed -i -E 's|^[Ii][Ss]_[Ss][Ll][Oo][Tt]_[Dd][Ee][Vv][Ii][Cc][Ee]=.*|IS_SLOT_DEVICE=0;|' anykernel.sh
+          echo "== anykernel.sh check =="
+          grep -n -i -E '^(block|is_slot_device|device\.name)' anykernel.sh
+          grep -q 'bootdevice/by-name/boot' anykernel.sh || { echo "block path bodlay ni, zip banano holo na"; exit 1; }
           cp ../out/arch/arm64/boot/Image.gz-dtb .
           zip -r9 ../kernel-ginkgo.zip *
 
